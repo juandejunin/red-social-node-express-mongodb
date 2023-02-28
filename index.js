@@ -36,9 +36,9 @@ app.get("/ruta-prueba", (req, res) => {
 })
 
 //cargar configuracion de las rutas
-app.use("/api" ,userRouters)
-app.use("/api" ,followRoutes)
-app.use("/api" ,publicationRouters)
+app.use("/api/user" ,userRouters)
+app.use("/api/follow" ,followRoutes)
+app.use("/api/aplication" ,publicationRouters)
 
 
 //poner el servidor a escuchar
