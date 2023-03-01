@@ -8,7 +8,9 @@ const jwt = require("../services/jwt")
 
 const pruebaUser = (req, res) => {
     return res.status(200).send({
-        message: "Mensaje enviado desde el controlador user"
+        message: "Mensaje enviado desde el controlador user",
+        usuario: req.user
+
     })
 }
 
