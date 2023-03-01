@@ -2,6 +2,9 @@ const User = require("../models/User")
 const bcrypt = require("bcrypt")
 
 
+//importar servicios
+const jwt = require("../services/jwt")
+
 
 const pruebaUser = (req, res) => {
     return res.status(200).send({
@@ -82,7 +85,7 @@ const login = (req, res) => {
 
     //BUscar en la base de datos
     User.findOne({ email: params.email })
-        .select({ "password": 0 })
+        // .select({ "password": 0 })
         .exec((error, user) => {
             if (error || !user) return res.status(404).send({
                 status: "error",
@@ -90,14 +93,28 @@ const login = (req, res) => {
             })
 
             //Comprobar la contraseña
+            let pwd = bcrypt.compareSync(params.password, user.password)
+
+            if (!pwd) {
+                return res.status(400).send({
+                    status: "error",
+                    message: "No te identificaste correctamente"
+                })
+            }
 
             //Devolver token
+            const token = jwt.createToken(user)
 
             //Devolver datos de usuario
             return res.status(200).send({
                 status: "success",
                 message: "accion de login",
-                user
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    nick: user.nick
+                },
+                token
             })
 
         })
