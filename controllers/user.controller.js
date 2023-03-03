@@ -250,11 +250,22 @@ const update = (req, res) => {
     })
 }
 
+const upload = (req,res) => {
+    return res.status(200).send({
+        status: "success",
+        message: "Subida de imagenes",
+        user: req.user,
+        file: req.file,
+        files: req.files
+    })
+}
+
 module.exports = {
     pruebaUser,
     register,
     login,
     profile,
     list,
-    update
+    update,
+    upload
 }
