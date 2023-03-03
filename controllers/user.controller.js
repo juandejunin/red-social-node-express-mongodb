@@ -7,6 +7,7 @@ const mongoosePagination = require("mongoose-pagination")
 const jwt = require("../services/jwt")
 
 
+
 const pruebaUser = (req, res) => {
     return res.status(200).send({
         message: "Mensaje enviado desde el controlador user",
@@ -61,8 +62,8 @@ const register = (req, res) => {
             //devolver el resultado
             return res.status(200).json({
                 status: "success",
-                message: "Accion de registro de usuarios",
-                user
+                message: "Usuario registrado exitosamente",
+
             })
 
         })
@@ -180,7 +181,7 @@ const list = (req, res) => {
             page,
             ItemsPerPage,
             total,
-            pages: Math.ceil(total/ItemsPerPage)
+            pages: Math.ceil(total / ItemsPerPage)
         })
 
     })
@@ -193,10 +194,67 @@ const list = (req, res) => {
 
 
 }
+
+const update = (req, res) => {
+    //Recoger la informacion del usuario a actualizar
+    const userIdentity = req.user
+    const userToUpdate = req.body
+    //eliminar campos sobrantes
+    delete userToUpdate.iat
+    delete userToUpdate.exp
+    delete userToUpdate.role
+    //Comprobar si el usuario existe
+    User.find({
+        $or: [
+            { email: userToUpdate.email.toLowerCase() },
+            { nick: userToUpdate.nick.toLowerCase() }
+        ]
+    }).exec(async (error, users) => {
+        if (error) return res.status(500).json({ status: "error", message: " Error en la consulta" })
+
+
+        let userIsset = false
+
+        users.forEach(user => {
+            if (user && user._id != userIdentity.id) userIsset = true
+
+        })
+        if (userIsset) {
+            return res.status(200).send({
+                status: "success",
+                message: "Acceso denegado"
+            })
+        }
+        //Si me llega la pasword cifrarla
+        //cifrar la contraseña
+        if (userToUpdate.password) {
+            let pwd = await bcrypt.hash(userToUpdate.password, 10)
+            userToUpdate.password = pwd
+        }
+
+        //Buscar y actualizar
+        User.findByIdAndUpdate(userIdentity.id, userToUpdate, { new: true }, (error, userToUpdate) => {
+
+            if (error || !userToUpdate) {
+                return res.status(500).json({ status: "error", message: " Error en la consulta" })
+            }
+
+            return res.status(200).send({
+                status: "success",
+                message: "Datos actualizados correctamente",
+                user: userToUpdate
+            })
+
+        })
+
+    })
+}
+
 module.exports = {
     pruebaUser,
     register,
     login,
     profile,
-    list
+    list,
+    update
 }
