@@ -1,10 +1,13 @@
-const User = require("../models/User")
+const User = require("../models/user")
 const bcrypt = require("bcrypt")
 const mongoosePagination = require("mongoose-pagination")
-
+const fs = require("fs")
+const path = require("path")
 
 //importar servicios
 const jwt = require("../services/jwt")
+const followService = require("../services/followService")
+
 
 
 
@@ -131,17 +134,22 @@ const profile = (req, res) => {
     //Consulta para obtener los datos del usuario
     User.findById(id,)
         .select({ password: 0, role: 0 })
-        .exec((error, userProfile) => {
+        .exec(async (error, userProfile) => {
             if (error || !userProfile) {
                 return res.status(404).send({
                     status: "error",
                     message: "Usuario no encontrado"
                 })
             }
+
+            //Obtener informacion de seguimiento
+            const followInfo = await followService.followThisUser(req.user.id, id)
             //Devolver el resultado
             return res.status(200).send({
                 status: "success",
-                user: userProfile
+                user: userProfile,
+                following: followInfo.following,
+                follower: followInfo.follower
             })
         })
 
@@ -162,7 +170,7 @@ const list = (req, res) => {
 
     let ItemsPerPage = 5
 
-    User.find().sort('_id').paginate(page, ItemsPerPage, (error, users, total) => {
+    User.find().sort('_id').paginate(page, ItemsPerPage, async (error, users, total) => {
 
         if (error || !users) {
             return res.status(404).send({
@@ -173,6 +181,8 @@ const list = (req, res) => {
 
 
         }
+        //Ver que usuarios que siguen a otro usuario me siguen a mi
+        let followUserIds = await followService.followUserIds(req.user.id)
 
         //Devolver el resultado
         return res.status(200).send({
@@ -181,7 +191,9 @@ const list = (req, res) => {
             page,
             ItemsPerPage,
             total,
-            pages: Math.ceil(total / ItemsPerPage)
+            pages: Math.ceil(total / ItemsPerPage),
+            user_following: followUserIds.following,
+            user_follow_me : followUserIds.followers
         })
 
     })
@@ -233,31 +245,98 @@ const update = (req, res) => {
         }
 
         //Buscar y actualizar
-        User.findByIdAndUpdate(userIdentity.id, userToUpdate, { new: true }, (error, userToUpdate) => {
+        try {
+            let userUpdate = await User.findByIdAndUpdate({ _id: userIdentity.id }, userToUpdate, { new: true })
 
-            if (error || !userToUpdate) {
-                return res.status(500).json({ status: "error", message: " Error en la consulta" })
+            if (!userToUpdate) {
+                return res.status(404).json({ status: "error", message: " Error en la consulta" })
             }
 
             return res.status(200).send({
                 status: "success",
                 message: "Datos actualizados correctamente",
-                user: userToUpdate
+                user: userUpdate
             })
 
-        })
+
+        } catch (error) {
+            return res.status(500).json({ status: "error", message: " Error en la consulta" })
+        }
+
+
 
     })
 }
 
-const upload = (req,res) => {
-    return res.status(200).send({
-        status: "success",
-        message: "Subida de imagenes",
-        user: req.user,
-        file: req.file,
-        files: req.files
+const upload = (req, res) => {
+
+    // Recoger el fichero de imagen y comprobar que existe
+    if (!req.file) {
+        return res.status(404).send({
+            status: "error",
+            message: "Peticion no incluye la imagen"
+        })
+    }
+
+    //Conseguir el nombre del archivo
+    let image = req.file.originalname.toLowerCase()
+
+    //Sacar la extension del archivo
+    const imageSplit = image.split("\.")
+    const extension = imageSplit[1]
+
+    // Comprobar la extension
+    if (extension != "png" && extension != "jpg" && extension != "jpeg" && extension != "gif") {
+        const filePath = req.file.path
+        //Si no es correcto, borrar el archivo
+        const filePathDelete = fs.unlinkSync(filePath)
+        //devolver respuesta
+        return res.status(400).send({
+            status: "error",
+            message: "Formato del archivo invalido"
+        })
+    }
+
+    //Si es correcto guardar la imagen en bbdd
+    User.findByIdAndUpdate({ _id: req.user.id }, { image: req.file.filename }, { new: true }, (error, userUpdate) => {
+        if (error || !userUpdate) {
+            return res.status(500).send({
+                status: "error",
+                message: "Error en la subida del avatar"
+            })
+
+        }
+        //devolver respuesta
+        return res.status(200).send({
+            status: "success",
+            message: "Subida de imagenes",
+            user: userUpdate,
+            file: req.file,
+
+
+        })
     })
+}
+
+const avatar = (req, res) => {
+    //Sacar el parametro de la url
+    const file = req.params.file
+
+    //Montar el path de la imagen
+    const filePath = "./uploads/avatars/" + file
+
+    //Comprobar que existe
+    fs.stat(filePath, (error, exists) => {
+        if (!exists) return res.status(400).send({
+            status: "error",
+            message: "Error al buscar el archivo"
+        })
+
+        //Devolver un file
+        return res.sendFile(path.resolve(filePath))
+    })
+
+
 }
 
 module.exports = {
@@ -267,5 +346,6 @@ module.exports = {
     profile,
     list,
     update,
-    upload
+    upload,
+    avatar
 }
