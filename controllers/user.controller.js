@@ -170,7 +170,7 @@ const list = (req, res) => {
 
     let ItemsPerPage = 5
 
-    User.find().sort('_id').paginate(page, ItemsPerPage, async (error, users, total) => {
+    User.find().select("-password -role -email -__v").sort('_id').paginate(page, ItemsPerPage, async (error, users, total) => {
 
         if (error || !users) {
             return res.status(404).send({
